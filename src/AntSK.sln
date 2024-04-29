@@ -25,6 +25,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AntSK.Test", "AntSK.Test\An
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AntSK.LLamaFactory", "AntSK.LLamaFactory\AntSK.LLamaFactory.csproj", "{664DFA1F-68B7-49C7-B889-FA14D1756D3D}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AntSK.OCR", "AntSK.OCR\AntSK.OCR.csproj", "{6195F7AA-18C2-4372-85CA-11FC4B522686}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,10 @@ Global
 		{664DFA1F-68B7-49C7-B889-FA14D1756D3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{664DFA1F-68B7-49C7-B889-FA14D1756D3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{664DFA1F-68B7-49C7-B889-FA14D1756D3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6195F7AA-18C2-4372-85CA-11FC4B522686}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6195F7AA-18C2-4372-85CA-11FC4B522686}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6195F7AA-18C2-4372-85CA-11FC4B522686}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6195F7AA-18C2-4372-85CA-11FC4B522686}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

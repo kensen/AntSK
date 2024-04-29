@@ -1,14 +1,16 @@
 中文|[English](https://github.com/AIDotNet/AntSK/blob/main/README.en.md)
 # AntSK
-## 基于.Net8+AntBlazor+SemanticKernel 打造的AI知识库/智能体
+## 使用.Net8+Blazor+SemanticKernel 打造的AI知识库/智能体
 
-## 核心功能
+## ⭐核心功能
 
 - **语义内核 (Semantic Kernel)**：采用领先的自然语言处理技术，准确理解、处理和响应复杂的语义查询，为用户提供精确的信息检索和推荐服务。
 
 - **内存内核 (Kernel Memory)**：具备持续学习和存储知识点的能力，AntSK 拥有长期记忆功能，累积经验，提供更个性化的交互体验。
 
-- **知识库**：通过文档（Word、PDF、Excel、Txt、Markdown、Json、PPT）等形式导入知识库，可以进行知识库问答。
+- **知识库**：通过文档（Word、PDF、Excel、Txt、Markdown、Json、PPT）等形式导入知识库，可以进行知识库问答，支持本地bge-embedding 向量模型 ，以及bge-rerank 重排模型。
+
+- **文生图**：集成**StableDiffusion** 本地模型，可以进行文生图。
 
 - **GPTs 生成**：此平台支持创建个性化的GPT模型，尝试构建您自己的GPT模型。
 
@@ -27,7 +29,7 @@
 - **模型微调**：规划中，基于llamafactory进行模型微调
   
 
-## 应用场景
+## ⛪应用场景
 
 AntSK 适用于多种业务场景，例如：
 - 企业级知识管理系统
@@ -38,35 +40,41 @@ AntSK 适用于多种业务场景，例如：
 - 教育与在线学习平台
 - 其他有意思的AI App
 
-## 功能示例
+## ✏️功能示例
 ### 在线演示
-```
-https://antsk.ai-dotnet.com/
-```
+
+[文档地址](http://antsk.cn/)
+
+[体验地址](https://antsk.ai-dotnet.com/)
+
 ```
 默认账号：test
 
 默认密码：test
 
 由于云服务器配置较低，无法运行本地模型，所以把系统设置权限关闭了，大家看看界面即可，要使用本地模型，请下载自行使用
+
+请勿在演示站点上传敏感信息
 ```
 
 ### 其他功能示例
 [视频示例](https://www.bilibili.com/video/BV1zH4y1h7Y9/)
 
-## 如何开始？
+[在线文档：http://antsk.cn](http://antsk.cn)
+
+## ❓如何开始？
 
 在这里我使用的是Postgres 作为数据存储和向量存储，因为Semantic Kernel和Kernel Memory都支持他，当然你也可以换成其他的。
 
-模型默认支持openai、azure openai 和llama支持的gguf本地模型,如果需要使用其他模型，可以使用one-api进行集成。
+模型默认支持openai、azure openai、讯飞星火、阿里云积、 和llama支持的gguf本地模型 以及llamafactory的本地模型,如果需要使用其他模型，可以使用one-api进行集成。
 
 配置文件中的Login配置是默认的登录账号和密码
 
 需要配置如下的配置文件
 
-## 使用docker-compose 
+## 1️⃣使用docker-compose 
 
-提供了pg版本 **appsettings.json** 和 简化版本（Sqlite+disk） **docker-compose.simple.yml**
+提供了pg版本 **appsettings.json** 和 简化版本（**Sqlite+disk**） **docker-compose.simple.yml**
 
 从项目根目录下载**docker-compose.yml**,然后把配置文件**appsettings.json**和它放在统一目录，
 
@@ -78,14 +86,14 @@ docker-compose up -d
 ```
 来启动AntSK
 
-## 如何在docker中挂载本地模型，和模型下载的目录
+## 2️⃣如何在docker中挂载本地模型，和模型下载的目录
 ```
 # 非 host 版本, 不使用本机代理
 version: '3.8'
 services:
   antsk:
     container_name: antsk
-    image: registry.cn-hangzhou.aliyuncs.com/AIDotNet/antsk:v0.1.5
+    image: registry.cn-hangzhou.aliyuncs.com/AIDotNet/antsk:v0.3.1
     ports:
       - 5000:5000
     networks:
@@ -98,6 +106,7 @@ services:
     volumes:
       - ./appsettings.json:/app/appsettings.json # 本地配置文件 需要放在同级目录
       - D://model:/app/model
+      - D://model:/root/.cache/modelscope/hub/AI-ModelScope #使用Llamafactory时需要挂载 否则初始化的环境重启后会丢失
 networks:
   antsk:
 ```
@@ -106,7 +115,7 @@ networks:
 model/xxx.gguf
 ```
 
-## 配置文件的一些含义
+## 3️⃣配置文件的一些含义
 ```
 {
   "DBConnection": {
@@ -139,9 +148,9 @@ DBConnection.DbType
 //连接字符串，需要根据不同DB类型，用对应的字符串
 DBConnection.ConnectionStrings
 
-//向量存储的类型，支持  Postgres、Disk、Memory、Qdrant、Redis
+//向量存储的类型，支持  Postgres、Disk、Memory、Qdrant、Redis、AzureAISearch
 //Postgres、Redis需要配置 ConnectionString
-//Qdrant 的 ConnectionString 使用 Endpoint|APIKey  
+//Qdrant 和AzureAISearch 的 ConnectionString 使用 Endpoint|APIKey  
 KernelMemory.VectorDb
 
 //本地模型使用的运行方式  GUP  CPU ,如果用在线API 这个随意使用一个即可
@@ -156,7 +165,7 @@ Login
 BackgroundTaskBroker.ImportKMSTask.WorkerCount
 ```
 
-## 找不到样式问题解决：
+## ⚠️找不到样式问题解决：
 AntSK/src/AntSK下执行:
 ```
 dotnet clean
@@ -171,9 +180,9 @@ dotnet AntSK.dll
 
 DB我使用的是CodeFirst模式，只要配置好数据库链接，表结构是自动创建的
 
-## 使用llamafactory
+## ✔️使用llamafactory
 ```
-1、首先需要确保你的环境已经安装了python和pip，如果使用镜像，例如v0.2.3.2版本已经包含了 python全套环境则无需此步骤
+1、首先需要确保你的环境已经安装了python和pip，如果使用镜像，例如p0.2.4版本已经包含了 python全套环境则无需此步骤
 2、进入模型添加页面选择llamafactory
 3、点击初始化，可以检查pip install 环境是否完成
 4、选择一个喜欢的模型
@@ -198,17 +207,28 @@ DB我使用的是CodeFirst模式，只要配置好数据库链接，表结构是
 <img src="https://contrib.rocks/image?repo=AIDotNet/AntSK&max=1000&columns=15&anon=1" />
 </a>
 ﻿
-## 🚨 行为准则
+## 🚨 使用协议
 
-该项目采用了贡献者公约定义的行为准则，以阐明我们社区的预期行为。有关更多信息，请参见 .NET Foundation 行为准则。 [.NET Foundation Code of Conduct](https://dotnetfoundation.org/code-of-conduct).
+本仓库遵循  [Apache-2.0 License](https://github.com/AIDotNet/AntSK?tab=Apache-2.0-1-ov-file) 开源协议。
+Apache开源许可证允许在商业环境中使用AntSK，前提是需要遵守许可证的条款。主要条款之一是要保留版权声明和许可证声明。
 
-想了解更多信息或开始使用 **AntSK**，可以关注我的公众号以及加入交流群。
+如果您打算在商业项目中使用AntSK，您需要确保遵守以下步骤：
 
-## 联系我
-如有任何问题或建议，请通过以下方式关注我的公众号，发消息与我联系，我们也有交流群，可以发送进群等消息，然后我会拉你进交流群
-![公众号](https://github.com/AIDotNet/AntSK/blob/main/images/gzh.jpg)
+1、包含Apache许可证的版权声明。 [Apache-2.0 License](https://github.com/AIDotNet/AntSK?tab=Apache-2.0-1-ov-file) 。
 
----
+2、如果您修改了软件源代码，您需要在源代码中明确标明这些修改。
 
-我们对您在**AntSK**的兴趣表示感谢，并期待与您携手共创智能化的未来！
+
+## ☎️联系我
+如有任何问题或建议，请通过以下方式关注我的公众号《许泽宇的技术分享》，发消息与我联系，我们也有AIDotnet交流群，可以发送进群等消息，然后我会拉你进交流群
+[公众号](https://github.com/AIDotNet/AntSK/blob/main/images/gzh.jpg)
+
+## 🌟 Star History
+<a href="https://github.com/AIDotNet/AntSK/stargazers" target="_blank" style="display: block" align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=AIDotNet/AntSK&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=AIDotNet/AntSK&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=AIDotNet/AntSK&type=Date" />
+  </picture>
+</a>
 

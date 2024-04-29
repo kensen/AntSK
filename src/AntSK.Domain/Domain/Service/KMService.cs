@@ -1,5 +1,6 @@
 ﻿using AntDesign;
 using AntSK.Domain.Common.DependencyInjection;
+using AntSK.Domain.Common.Embedding;
 using AntSK.Domain.Domain.Interface;
 using AntSK.Domain.Domain.Model.Constant;
 using AntSK.Domain.Domain.Model.Dto;
@@ -7,6 +8,7 @@ using AntSK.Domain.Domain.Other;
 using AntSK.Domain.Options;
 using AntSK.Domain.Repositories;
 using AntSK.Domain.Utils;
+using AntSK.OCR;
 using DocumentFormat.OpenXml.Drawing.Diagrams;
 using LLama;
 using LLamaSharp.KernelMemory;
@@ -15,6 +17,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Microsoft.KernelMemory;
 using Microsoft.KernelMemory.Configuration;
+using Microsoft.KernelMemory.DataFormats;
 using Microsoft.KernelMemory.FileSystem.DevTools;
 using Microsoft.KernelMemory.MemoryStorage;
 using Microsoft.KernelMemory.MemoryStorage.DevTools;
@@ -26,7 +29,8 @@ namespace AntSK.Domain.Domain.Service
     public class KMService(
         IKmss_Repositories _kmss_Repositories,
         IAIModels_Repositories _aIModels_Repositories,
-        IMessageService? _message
+        IMessageService? _message,
+        IKernelService _kernelService
     ) : IKMService
     {
         private MemoryServerless _memory;
@@ -35,20 +39,36 @@ namespace AntSK.Domain.Domain.Service
 
         public List<UploadFileItem> FileList => _fileList;
 
-        public MemoryServerless GetMemory(Apps app)
+        public MemoryServerless GetMemoryByApp(Apps app)
         {
             var chatModel = _aIModels_Repositories.GetFirst(p => p.Id == app.ChatModelID);
             var embedModel = _aIModels_Repositories.GetFirst(p => p.Id == app.EmbeddingModelID);
             var chatHttpClient = OpenAIHttpClientHandlerUtil.GetHttpClient(chatModel.EndPoint);
             var embeddingHttpClient = OpenAIHttpClientHandlerUtil.GetHttpClient(embedModel.EndPoint);
-
-            var searchClientConfig = new SearchClientConfig
+            SearchClientConfig searchClientConfig;
+            if (string.IsNullOrEmpty(app.RerankModelID))
             {
-                MaxAskPromptSize = 2048,
-                MaxMatchesCount = 3,
-                AnswerTokens = 1000,
-                EmptyAnswer = KmsConstantcs.KmsSearchNull
-            };
+                //不重排直接取查询数
+                searchClientConfig = new SearchClientConfig
+                {
+                    MaxAskPromptSize = app.MaxAskPromptSize,
+                    MaxMatchesCount = app.MaxMatchesCount,
+                    AnswerTokens = app.AnswerTokens,
+                    EmptyAnswer = KmsConstantcs.KmsSearchNull
+                };
+            }
+            else 
+            {
+                //重排取rerank数
+                searchClientConfig = new SearchClientConfig
+                {
+                    MaxAskPromptSize = app.MaxAskPromptSize,
+                    MaxMatchesCount = app.RerankCount,
+                    AnswerTokens = app.AnswerTokens,
+                    EmptyAnswer = KmsConstantcs.KmsSearchNull
+                };
+            }
+           
 
             var memoryBuild = new KernelMemoryBuilder()
                   .WithSearchClientConfig(searchClientConfig)
@@ -70,7 +90,7 @@ namespace AntSK.Domain.Domain.Service
             return _memory;
         }
 
-        public MemoryServerless GetMemoryByKMS(string kmsID, SearchClientConfig searchClientConfig = null)
+        public MemoryServerless GetMemoryByKMS(string kmsID)
         {
             //if (_memory.IsNull())
             {
@@ -84,38 +104,48 @@ namespace AntSK.Domain.Domain.Service
                 var embeddingHttpClient = OpenAIHttpClientHandlerUtil.GetHttpClient(embedModel.EndPoint);
 
                 //搜索配置
-                if (searchClientConfig.IsNull())
-                {
-                    searchClientConfig = new SearchClientConfig
-                    {
-                        MaxAskPromptSize = 2048,
-                        MaxMatchesCount = 3,
-                        AnswerTokens = 1000,
-                        EmptyAnswer = KmsConstantcs.KmsSearchNull
-                    };
-                }
+                //if (searchClientConfig.IsNull())
+                //{
+                //    searchClientConfig = new SearchClientConfig
+                //    {
+                //        MaxAskPromptSize = 2048,
+                //        MaxMatchesCount = 3,
+                //        AnswerTokens = 1000,
+                //        EmptyAnswer = KmsConstantcs.KmsSearchNull
+                //    };
+                //}
 
                 var memoryBuild = new KernelMemoryBuilder()
-                    .WithSearchClientConfig(searchClientConfig)
+                    //.WithSearchClientConfig(searchClientConfig)
                     .WithCustomTextPartitioningOptions(new TextPartitioningOptions
                     {
                         MaxTokensPerLine = kms.MaxTokensPerLine,
                         MaxTokensPerParagraph = kms.MaxTokensPerParagraph,
                         OverlappingTokens = kms.OverlappingTokens
                     });
+                //加载OCR
+                WithOcr(memoryBuild, kms);
                 //加载会话模型
                 WithTextGenerationByAIType(memoryBuild, chatModel, chatHttpClient);
                 //加载向量模型
                 WithTextEmbeddingGenerationByAIType(memoryBuild, embedModel, embeddingHttpClient);
                 //加载向量库
                 WithMemoryDbByVectorDB(memoryBuild);
-
-                _memory = memoryBuild.Build<MemoryServerless>();
+              
+                _memory = memoryBuild.AddSingleton<IKernelService>(_kernelService).Build<MemoryServerless>();
                 return _memory;
             }
             //else {
             //    return _memory;
             //}
+        }
+
+        private static void WithOcr(IKernelMemoryBuilder memoryBuild, Kmss kms)
+        {
+            if (kms.IsOCR == 1)
+            {
+                memoryBuild.WithCustomImageOcr(new AntSKOcrEngine());
+            }
         }
 
         private void WithTextEmbeddingGenerationByAIType(IKernelMemoryBuilder memory, AIModels embedModel,
@@ -146,6 +176,11 @@ namespace AntSK.Domain.Domain.Service
                     var (weights, parameters) = LLamaConfig.GetLLamaConfig(embedModel.ModelName);
                     var embedder = new LLamaEmbedder(weights, parameters);
                     memory.WithLLamaSharpTextEmbeddingGeneration(new LLamaSharpTextEmbeddingGenerator(embedder));
+                    break;
+                case Model.Enum.AIType.BgeEmbedding:
+                    string pyDll = embedModel.EndPoint;
+                    string bgeEmbeddingModelName = embedModel.ModelName;
+                    memory.WithBgeTextEmbeddingGeneration(new HuggingfaceTextEmbeddingGenerator(pyDll,bgeEmbeddingModelName));
                     break;
                 case Model.Enum.AIType.DashScope:
                     memory.WithDashScopeDefaults(embedModel.ModelKey);
@@ -182,6 +217,14 @@ namespace AntSK.Domain.Domain.Service
                     var context = weights.CreateContext(parameters);
                     var executor = new StatelessExecutor(weights, parameters);
                     memory.WithLLamaSharpTextGeneration(new LlamaSharpTextGenerator(weights, context, executor));
+                    break;
+                case Model.Enum.AIType.LLamaFactory:
+
+                    memory.WithOpenAITextGeneration(new OpenAIConfig()
+                    {
+                        APIKey = "NotNull",
+                        TextModel = chatModel.ModelName
+                    }, null, chatHttpClient);
                     break;
                 case Model.Enum.AIType.DashScope:
                     memory.WithDashScopeTextGeneration(new Cnblogs.KernelMemory.AI.DashScope.DashScopeConfig
@@ -222,17 +265,17 @@ namespace AntSK.Domain.Domain.Service
                     break;
                 case "Qdrant":
                     var qdrantConfig = ConnectionString.Split("|");
-                    memory.WithQdrantMemoryDb(new QdrantConfig() 
-                    { 
-                        Endpoint= qdrantConfig[0],
-                        APIKey= qdrantConfig[1],
-                    });
+                    memory.WithQdrantMemoryDb(qdrantConfig[0],qdrantConfig[1]);
                     break;
                 case "Redis":
                     memory.WithRedisMemoryDb(new RedisConfig()
                     {
                         ConnectionString = ConnectionString,
                     });
+                    break;
+                case "AzureAISearch":
+                    var aisearchConfig = ConnectionString.Split("|");
+                    memory.WithAzureAISearchMemoryDb(aisearchConfig[0], aisearchConfig[1]);
                     break;
             }
         }
@@ -248,7 +291,7 @@ namespace AntSK.Domain.Domain.Service
             {
                 foreach (var memoryDb in memoryDbs)
                 {
-                    var items = await memoryDb.GetListAsync(memoryIndex.Name, new List<MemoryFilter>() { new MemoryFilter().ByDocument(fileId) }, 100, true).ToListAsync();
+                    var items = await memoryDb.GetListAsync(memoryIndex.Name, new List<MemoryFilter>() { new MemoryFilter().ByDocument(fileId) }, 1000, true).ToListAsync();
                     docTextList.AddRange(items.Select(item => new KMFile()
                     {
                         DocumentId = item.GetDocumentId(),
@@ -263,15 +306,15 @@ namespace AntSK.Domain.Domain.Service
             return docTextList;
         }
 
-        public async Task<List<RelevantSource>> GetRelevantSourceList(string kmsIdListStr, string msg)
+        public async Task<List<RelevantSource>> GetRelevantSourceList(Apps app ,string msg)
         {
             var result = new List<RelevantSource>();
-            if (string.IsNullOrWhiteSpace(kmsIdListStr))
+            if (string.IsNullOrWhiteSpace(app.KmsIdList))
                 return result;
-            var kmsIdList = kmsIdListStr.Split(",");
+            var kmsIdList = app.KmsIdList.Split(",");
             if (!kmsIdList.Any()) return result;
 
-            var memory = GetMemoryByKMS(kmsIdList.FirstOrDefault()!);
+            var memory = GetMemoryByApp(app);
 
             var filters = kmsIdList.Select(kmsId => new MemoryFilter().ByTag(KmsConstantcs.KmsIdTag, kmsId)).ToList();
 
@@ -283,7 +326,7 @@ namespace AntSK.Domain.Domain.Service
                     result.AddRange(item.Partitions.Select(part => new RelevantSource()
                     {
                         SourceName = item.SourceName,
-                        Text = Markdown.ToHtml(part.Text),
+                        Text = part.Text,
                         Relevance = part.Relevance
                     }));
                 }
@@ -305,7 +348,10 @@ namespace AntSK.Domain.Domain.Service
                 "application/pdf",
                 "application/json",
                 "text/x-markdown",
-                "text/markdown"
+                "text/markdown",
+                "image/jpeg",
+                "image/png",
+                "image/tiff"
             };
 
             string[] exceptExts = [".md", ".pdf"];

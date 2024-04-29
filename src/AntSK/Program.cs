@@ -9,6 +9,7 @@ using AntSK.Domain.Repositories;
 using AntSK.Domain.Utils;
 using AntSK.plugins.Functions;
 using AntSK.Services.Auth;
+using Blazored.LocalStorage;
 using LLama.Native;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -48,6 +49,8 @@ builder.Services.AddServicesFromAssemblies("AntSK.Domain");
 builder.Services.AddSingleton(sp => new FunctionService(sp, [typeof(AntSK.App).Assembly]));
 builder.Services.AddScoped<FunctionTest>();
 builder.Services.AddAntSKSwagger();
+builder.Services.AddBlazoredLocalStorage(config =>
+        config.JsonSerializerOptions.WriteIndented = true);
 //Mapper
 builder.Services.AddMapper();
 //后台队列任务
@@ -63,14 +66,19 @@ builder.Services.AddBackgroundTaskBroker().AddHandler<ImportKMSTaskReq, BackGrou
         NativeLibraryConfig
            .Instance
            .WithCuda(false)
-           .WithLogs(true);
+           .WithLogCallback((level, message) => {
+               Console.WriteLine($"[llama {level}]: {message.TrimEnd('\n')}");
+            });
     }
     else if (LLamaSharpOption.RunType.ToUpper() == "GPU")
     {
         NativeLibraryConfig
         .Instance
         .WithCuda(true)
-        .WithLogs(true);
+        .WithLogCallback((level, message) => {
+            Console.WriteLine($"[llama {level}]: {message.TrimEnd('\n')}");
+         })
+        .WithAvx(NativeLibraryConfig.AvxLevel.Avx);
     }
 }
 

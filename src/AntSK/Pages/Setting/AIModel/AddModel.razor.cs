@@ -3,6 +3,7 @@ using AntDesign.ProLayout;
 using AntSK.Domain.Domain.Interface;
 using AntSK.Domain.Domain.Model.Constant;
 using AntSK.Domain.Domain.Model.Enum;
+using AntSK.Domain.Domain.Other.Bge;
 using AntSK.Domain.Domain.Service;
 using AntSK.Domain.Options;
 using AntSK.Domain.Repositories;
@@ -12,6 +13,7 @@ using BlazorComponents.Terminal;
 using DocumentFormat.OpenXml.Office2010.Excel;
 using Downloader;
 using Microsoft.AspNetCore.Components;
+using NRedisStack.Search;
 using System.ComponentModel;
 
 namespace AntSK.Pages.Setting.AIModel
@@ -58,6 +60,15 @@ namespace AntSK.Pages.Setting.AIModel
         private TerminalParagraph para;
         private bool _logModalVisible;
 
+        private List<string> bgeEmbeddingList = new List<string>() { "AI-ModelScope/bge-small-zh-v1.5", "AI-ModelScope/bge-base-zh-v1.5", "AI-ModelScope/bge-large-zh-v1.5" };
+        private List<string> bgeRerankList = new List<string>() { "Xorbits/bge-reranker-base", "Xorbits/bge-reranker-large", "AI-ModelScope/bge-reranker-v2-m3", "AI-ModelScope/bge-reranker-v2-gemma"};
+        private bool BgeEmbeddingIsStart = false;
+        private string BgeEmbeddingBtnText = "初始化";
+
+        private bool BgeRerankIsStart = false;
+        private string BgeRerankBtnText = "初始化";
+
+
         protected override async Task OnInitializedAsync()
         {
             try
@@ -75,12 +86,25 @@ namespace AntSK.Pages.Setting.AIModel
                     llamaFactoryIsStart = llamaFactoryDic.Value == "false" ? false : true;
                 }
 
+               
                 //目前只支持gguf的 所以筛选一下
-                _modelFiles = Directory.GetFiles(Path.Combine(Directory.GetCurrentDirectory(), LLamaSharpOption.FileDirectory)).Where(p=>p.Contains(".gguf")).ToArray();
+                _modelFiles = Directory.GetFiles(Path.Combine(Directory.GetCurrentDirectory(), LLamaSharpOption.FileDirectory)).Where(p=> p.Contains(".gguf")||p.Contains(".ckpt")|| p.Contains(".safetensors")).ToArray();
                 if (!string.IsNullOrEmpty(ModelPath))
                 {
+                    string extension = Path.GetExtension(ModelPath);
+                    switch (extension)
+                    {
+                        case ".gguf":
+                            _aiModel.AIType = AIType.LLamaSharp;
+                            break;
+                        case ".safetensors":
+                        case ".ckpt":
+                            _aiModel.AIType = AIType.StableDiffusion;
+                            break;
+
+                    }
                     //下载页跳入
-                    _aiModel.AIType = AIType.LLamaSharp;
+                 
                     _downloadModalVisible = true;
 
                     _downloadUrl = $"https://hf-mirror.com{ModelPath.Replace("---","/")}";
@@ -131,7 +155,7 @@ namespace AntSK.Pages.Setting.AIModel
 
         private void Back()
         {
-            NavigationManager.NavigateTo("/setting/modellist");
+            NavigationManager.NavigateTo("/modelmanager/modellist");
         }
 
         private async Task StartDownload()
@@ -214,7 +238,7 @@ namespace AntSK.Pages.Setting.AIModel
         /// <summary>
         /// 启动服务
         /// </summary>
-        private void StartLFService()
+        private async Task StartLFService()
         {
             if (string.IsNullOrEmpty(_aiModel.ModelName))
             {
@@ -248,6 +272,70 @@ namespace AntSK.Pages.Setting.AIModel
                 _ILLamaFactoryService.PipInstall();
             }
         }
+
+        private async Task BgeEmbedding()
+        {
+            if (string.IsNullOrEmpty(_aiModel.ModelName))
+            {
+                _ = Message.Error("请输入模型名称！", 2);
+                return;
+            }
+            if (string.IsNullOrEmpty(_aiModel.EndPoint))
+            {
+                _ = Message.Error("请输入正确的Python dll或python so路径！", 2);
+                return;
+            }
+
+            BgeEmbeddingIsStart = true;
+            BgeEmbeddingBtnText = "正在初始化...";
+            await Task.Run(() =>
+            {
+                try
+                {
+                    BgeEmbeddingConfig.LoadModel(_aiModel.EndPoint, _aiModel.ModelName);
+                    BgeEmbeddingBtnText = "初始化完成";
+                    BgeEmbeddingIsStart = false;
+                }
+                catch (System.Exception ex)
+                {
+                    _ = Message.Error(ex.Message, 2);
+                    BgeEmbeddingIsStart = false;
+                }
+            });   
+        }
+
+        private async Task BgeRerank()
+        {
+            if (string.IsNullOrEmpty(_aiModel.ModelName))
+            {
+                _ = Message.Error("请输入模型名称！", 2);
+                return;
+            }
+            if (string.IsNullOrEmpty(_aiModel.EndPoint))
+            {
+                _ = Message.Error("请输入正确的Python dll或python so路径！", 2);
+                return;
+            }
+
+            BgeRerankIsStart = true;
+            BgeRerankBtnText = "正在初始化...";
+            await Task.Run(() =>
+            {
+                try
+                {
+                    BegRerankConfig.LoadModel(_aiModel.EndPoint, _aiModel.ModelName);
+                    BgeRerankBtnText = "初始化完成";
+                    BgeRerankIsStart = false;
+                }
+                catch (System.Exception ex)
+                {
+                    _ = Message.Error(ex.Message, 2);
+                    BgeRerankIsStart = false;
+                }
+            });
+        }
+
+
         private async Task CmdLogHandler(string message)
         {
             await InvokeAsync(() =>
@@ -262,6 +350,32 @@ namespace AntSK.Pages.Setting.AIModel
    
         private void OnCancelLog() {
             _logModalVisible = false;
+        }
+
+        private void AITypeChange(AIType aiType) 
+        {
+            switch (aiType)
+            { 
+                case AIType.LLamaFactory:
+                    _aiModel.EndPoint = "http://localhost:8000/";
+                    _aiModel.AIModelType=AIModelType.Chat;
+                    break;
+                case AIType.StableDiffusion:
+                    _aiModel.AIModelType = AIModelType.Image;
+                    break;
+                case AIType.Mock:
+                    _aiModel.AIModelType = AIModelType.Chat;
+                    break ;
+                case AIType.BgeEmbedding:
+                    _aiModel.AIModelType = AIModelType.Embedding;
+                    break;
+                case AIType.BgeRerank:
+                    _aiModel.AIModelType = AIModelType.Rerank;
+                    break;
+                default:
+                    _aiModel.AIModelType = AIModelType.Chat;
+                    break;
+            }
         }
     }
 }

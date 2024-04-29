@@ -21,12 +21,18 @@ namespace AntSK.Domain.Domain.Model.Enum
 
         [Display(Name = "灵积大模型")]
         DashScope = 5,
-        
+
         [Display(Name = "LLamaFactory")]
         LLamaFactory = 6,
-
+        [Display(Name = "Bge Embedding")]
+        BgeEmbedding = 7,
+        [Display(Name = "Bge Rerank")]
+        BgeRerank = 8,
+        [Display(Name = "StableDiffusion")]
+        StableDiffusion = 9,
         [Display(Name = "模拟输出")]
         Mock = 100,
+
     }
 
     /// <summary>
@@ -36,5 +42,7 @@ namespace AntSK.Domain.Domain.Model.Enum
     {
         Chat = 1,
         Embedding = 2,
+        Image=3,
+        Rerank=4
     }
 }
