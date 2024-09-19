@@ -4,24 +4,16 @@ using AntSK.Domain.Domain.Interface;
 using AntSK.Domain.Domain.Other;
 using AntSK.Domain.Repositories;
 using AntSK.Domain.Utils;
-using LLama;
-using LLamaSharp.SemanticKernel.TextCompletion;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Plugins.Core;
 using Microsoft.SemanticKernel.TextGeneration;
 using RestSharp;
-using System;
 using ServiceLifetime = AntSK.Domain.Common.DependencyInjection.ServiceLifetime;
 using AntSK.LLM.Mock;
 using AntSK.Domain.Domain.Model.Enum;
-using AntSK.LLM.LLamaFactory;
-using System.Reflection;
-using DocumentFormat.OpenXml.Drawing;
-using Microsoft.KernelMemory;
-using OpenCvSharp.ML;
-using LLamaSharp.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.Extensions.Logging;
 
 namespace AntSK.Domain.Domain.Service
 {
@@ -33,17 +25,20 @@ namespace AntSK.Domain.Domain.Service
         private readonly FunctionService _functionService;
         private readonly IServiceProvider _serviceProvider;
         private Kernel _kernel;
+        private readonly ILogger<KernelService> _logger;
 
         public KernelService(
               IApis_Repositories apis_Repositories,
               IAIModels_Repositories aIModels_Repositories,
               FunctionService functionService,
-              IServiceProvider serviceProvider)
+              IServiceProvider serviceProvider,
+               ILogger<KernelService> logger)
         {
             _apis_Repositories = apis_Repositories;
             _aIModels_Repositories = aIModels_Repositories;
             _functionService = functionService;
             _serviceProvider = serviceProvider;
+            _logger = logger;
         }
 
         /// <summary>
@@ -103,15 +98,30 @@ namespace AntSK.Domain.Domain.Service
                         );
                     break;
 
-                case Model.Enum.AIType.LLamaSharp:
-                    var (weights, parameters) = LLamaConfig.GetLLamaConfig(chatModel.ModelName);
-                    var ex = new StatelessExecutor(weights, parameters);
-                    builder.Services.AddKeyedSingleton<ITextGenerationService>("local-llama", new LLamaSharpTextCompletion(ex));
-                    builder.Services.AddKeyedSingleton<IChatCompletionService>("local-llama-chat", new LLamaSharpChatCompletion(ex));
-                    break;
-
                 case Model.Enum.AIType.SparkDesk:
-                    var options = new SparkDeskOptions { AppId = chatModel.EndPoint, ApiSecret = chatModel.ModelKey, ApiKey = chatModel.ModelName, ModelVersion = Sdcb.SparkDesk.ModelVersion.V3_5 };
+
+                    var settings = chatModel.ModelKey.Split("|");
+
+                    Sdcb.SparkDesk.ModelVersion modelVersion = Sdcb.SparkDesk.ModelVersion.V3_5;
+
+                    switch (chatModel.ModelName)
+                    {
+                        case "V3_5":
+                            modelVersion = Sdcb.SparkDesk.ModelVersion.V3_5;
+                            break;
+                        case "V3":
+                            modelVersion = Sdcb.SparkDesk.ModelVersion.V3;
+                            break;
+                        case "V2":
+                            modelVersion = Sdcb.SparkDesk.ModelVersion.V2;
+                            break;
+                        case "V1_5":
+                            modelVersion = Sdcb.SparkDesk.ModelVersion.V1_5;
+                            break;
+                    }
+
+                    SparkDeskOptions options = new SparkDeskOptions { AppId = settings[0], ApiSecret = settings[1], ApiKey = settings[2], ModelVersion = modelVersion };
+                
                     builder.Services.AddKeyedSingleton<ITextGenerationService>("spark-desk", new SparkDeskTextCompletion(options, chatModel.Id));
                     builder.Services.AddKeyedSingleton<IChatCompletionService>("spark-desk-chat", new SparkDeskChatCompletion(options, chatModel.Id));
                     break;
@@ -127,7 +137,14 @@ namespace AntSK.Domain.Domain.Service
                 case Model.Enum.AIType.LLamaFactory:
                     builder.AddOpenAIChatCompletion(
                      modelId: chatModel.ModelName,
-                     apiKey: "123",
+                     apiKey: "NotNull",
+                     httpClient: chatHttpClient
+                       );
+                    break;
+                case AIType.Ollama:
+                    builder.AddOpenAIChatCompletion(
+                     modelId: chatModel.ModelName,
+                     apiKey: "NotNull",
                      httpClient: chatHttpClient
                        );
                     break;
@@ -142,7 +159,7 @@ namespace AntSK.Domain.Domain.Service
         public void ImportFunctionsByApp(Apps app, Kernel _kernel)
         {
             //插件不能重复注册，否则会异常
-            if (_kernel.Plugins.Any(p => p.Name == "AntSkFunctions"))
+            if (_kernel.Plugins.Any(p => p.Name == "AntSKFunctions"))
             {
                 return;
             }
@@ -153,7 +170,7 @@ namespace AntSK.Domain.Domain.Service
             //本地函数插件
             ImportNativeFunction(app, functions);
 
-            _kernel.ImportPluginFromFunctions("AntSkFunctions", functions);
+            _kernel.ImportPluginFromFunctions("AntSKFunctions", functions);
         }
 
         /// <summary>
@@ -224,7 +241,7 @@ namespace AntSK.Domain.Domain.Service
                             {
                                 try
                                 {
-                                    Console.WriteLine(jsonBody);
+                                    _logger.LogInformation(jsonBody);
                                     RestClient client = new RestClient();
                                     RestRequest request = new RestRequest(api.Url, Method.Post);
                                     foreach (var header in api.Header.ConvertToString().Split("\n"))

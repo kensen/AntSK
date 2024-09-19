@@ -54,10 +54,6 @@
                                             {
                                                 <Tag Color="@PresetColor.Red.ToString()">AzureOpenAI</Tag>
                                             }
-                                            else if (context.AIType == AIType.LLamaSharp)
-                                            {
-                                                <Tag Color="@PresetColor.Yellow.ToString()">LLamaSharp</Tag>
-                                            }
                                             else if (context.AIType == AIType.SparkDesk)
                                             {
                                                 <Tag Color="@PresetColor.Cyan.ToString()">SparkDesk</Tag>
@@ -81,6 +77,10 @@
                                             else if (context.AIType == AIType.StableDiffusion)
                                             {
                                                 <Tag Color="@PresetColor.Magenta.ToString()">StableDiffusion</Tag>
+                                            }
+                                            else if (context.AIType == AIType.Ollama || context.AIType == AIType.OllamaEmbedding)
+                                                            {
+                                                <Tag Color="@PresetColor.Pink.ToString()">Ollama</Tag>
                                             }
                                         </p>
                                     </div>

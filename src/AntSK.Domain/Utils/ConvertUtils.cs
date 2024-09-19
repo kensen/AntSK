@@ -1,4 +1,8 @@
-﻿using System.Web;
+﻿using Newtonsoft.Json;
+using Serilog;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
+using System.Web;
 
 namespace AntSK.Domain.Utils
 {
@@ -260,6 +264,56 @@ namespace AntSK.Domain.Utils
         public static bool ComparisonIgnoreCase(this string s, string value)
         {
             return s.Equals(value, StringComparison.OrdinalIgnoreCase);
+        }
+
+
+        /// <summary>
+        /// \uxxxx转中文,保留换行符号
+        /// </summary>
+        /// <param name="unicodeString"></param>
+        /// <returns></returns>
+        public static string Unescape(this string value)
+        {
+            if (value.IsNull())
+            {
+                return "";
+            }
+
+            try
+            {
+                Formatting formatting = Formatting.None;
+
+                object jsonObj = JsonConvert.DeserializeObject(value);
+                string unescapeValue = JsonConvert.SerializeObject(jsonObj, formatting);
+                return unescapeValue;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex.ToString());
+                return "";
+            }
+        }
+
+
+        /// <summary>
+        /// 是否为流式请求
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static bool IsStream(this string value)
+        {
+            // 正则表达式忽略空格的情况
+            string pattern = @"\s*""stream""\s*:\s*true\s*";
+
+            // 使用正则表达式匹配
+            bool contains = Regex.IsMatch(value, pattern);
+            return contains;
+        }
+
+        public static string AntSKCalculateSHA256(this BinaryData binaryData)
+        {
+            byte[] byteArray = SHA256.HashData(binaryData.ToMemory().Span);
+            return Convert.ToHexString(byteArray).ToLowerInvariant();
         }
     }
 }

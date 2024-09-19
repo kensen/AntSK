@@ -1,5 +1,6 @@
-﻿using Microsoft.KernelMemory.AI.OpenAI.GPT3;
+﻿using Microsoft.KernelMemory.AI.OpenAI;
 using Python.Runtime;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,13 +27,7 @@ namespace AntSK.Domain.Domain.Other.Bge
             {
                 if (model == null)
                 {
-                    //Runtime.PythonDLL = @"D:\Programs\Python\Python311\python311.dll";
-                    if (string.IsNullOrEmpty(Runtime.PythonDLL))
-                    {
-                        Runtime.PythonDLL = pythondllPath;
-                    }
-                    PythonEngine.Initialize();
-                    PythonEngine.BeginAllowThreads();
+                    PyRunTime.InitRunTime(pythondllPath);
                     try
                     {
                         using (GIL())// 初始化Python环境的Global Interpreter Lock)
@@ -85,13 +80,13 @@ namespace AntSK.Domain.Domain.Other.Bge
             //    return len;
 
             //}
-            var tokenCount1 = GPT3Tokenizer.Encode(queryStr).Count;
+            var tokenCount1 = DefaultGPTTokenizer.StaticCountTokens(queryStr);
             return tokenCount1;
         }
 
         public static void Dispose()
         {
-            Console.WriteLine("python dispose");
+            Log.Information("python dispose");
         }
     }
 }

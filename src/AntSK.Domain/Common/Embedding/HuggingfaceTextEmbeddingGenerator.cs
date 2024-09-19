@@ -1,12 +1,4 @@
-﻿using LLama.Common;
-using LLama;
-using LLamaSharp.KernelMemory;
-using Microsoft.KernelMemory.AI;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Microsoft.KernelMemory.AI;
 using AntSK.Domain.Domain.Other.Bge;
 
 namespace AntSK.Domain.Common.Embedding
@@ -51,6 +43,11 @@ namespace AntSK.Domain.Common.Embedding
         public int CountTokens(string text)
         {
             return BgeEmbeddingConfig.TokenCount(text);
+        }
+
+        public IReadOnlyList<string> GetTokens(string text)
+        {
+            return new List<string>();
         }
     }
 }

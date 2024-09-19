@@ -48,7 +48,7 @@
       },
       {
         "path": "/modelmanager/modeldown",
-        "name": "模型下载",
+        "name": "作图模型下载",
         "key": "modelmanager.modeldown"
       }
     ]
@@ -77,10 +77,16 @@
     ]
   },
   {
-    "path": "http://antsk.cn/",
-    "name": "使用文档",
+    "path": "https://antsk.cn",
+    "name": "官方文档",
     "key": "antskdoc",
     "icon": "question-circle"
+  },
+  {
+    "path": "https://api.antsk.cn/",
+    "name": "GPT代理接口",
+    "key": "antskapi",
+    "icon": "bulb"
   },
   {
     "path": "https://www.bilibili.com/video/BV1vK421b7NF",

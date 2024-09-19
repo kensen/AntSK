@@ -7,6 +7,7 @@ using AntSK.Domain.Repositories;
 using AntSK.Domain.Utils;
 using AntSK.LLM.StableDiffusion;
 using AntSK.Models;
+using AntSK.Pages.KmsPage;
 using Blazored.LocalStorage;
 using DocumentFormat.OpenXml.InkML;
 using Markdig;
@@ -18,6 +19,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Text;
 
 namespace AntSK.Pages.ChatPage.Components
 {
@@ -42,6 +44,8 @@ namespace AntSK.Pages.ChatPage.Components
         [Inject] ILocalStorageService _localStorage { get; set; }
         [Inject] IChats_Repositories _chats_Repositories { get; set; }
         [Inject] ProtectedSessionStorage _protectedSessionStore { get; set; }
+
+        [Inject] protected ILogger<ChatView> _logger { get; set; }
 
         protected List<Chats> MessageList = [];
         protected string? _messageInput;
@@ -79,6 +83,7 @@ namespace AntSK.Pages.ChatPage.Components
             var userSession = userSessionStorageResult.Success ? userSessionStorageResult.Value : null;
             _userName = userSession?.UserName;
             await GetMsgList();
+            await MarkDown();
         }
         /// <summary>
         /// 获取聊天记录列表
@@ -201,7 +206,7 @@ namespace AntSK.Pages.ChatPage.Components
             catch (System.Exception ex)
             {
                 Sendding = false;
-                Console.WriteLine("异常:" + ex.Message);
+                _logger.LogError("异常:" + ex.Message);
                 _ = Message.Error("异常:" + ex.Message, 2);
             }
 
@@ -235,17 +240,15 @@ namespace AntSK.Pages.ChatPage.Components
 
             //处理多轮会话
             Apps app = _apps_Repositories.GetFirst(p => p.Id == AppId);
-            ChatHistory history;
+            ChatHistory history = new ChatHistory();
 
             if (app.Type == AppType.chat.ToString() && (filePath == null || app.EmbeddingModelID.IsNull()))
             {
-                if (string.IsNullOrEmpty(app.Prompt))
+                if (!string.IsNullOrEmpty(app.Prompt))
                 {
-                    app.Prompt = "你叫AntSK,是一个人工智能助手";
+                    history = new ChatHistory(app.Prompt.ConvertToString());
                 }
                 //聊天应用增加系统角色
-                history = new ChatHistory(app.Prompt.ConvertToString());
-
                 if (MessageList.Count > 0)
                 {
                     history = await _chatService.GetChatHistory(MessageList, history);
@@ -254,8 +257,6 @@ namespace AntSK.Pages.ChatPage.Components
             }
             else if (app.Type == AppType.kms.ToString() || filePath != null || app.EmbeddingModelID.IsNotNull())
             {
-                history = new ChatHistory();
-
                 if (MessageList.Count > 0)
                 {
                     history = await _chatService.GetChatHistory(MessageList, history);
@@ -324,15 +325,16 @@ namespace AntSK.Pages.ChatPage.Components
             };
             MessageList.Add(info);
             var chatResult = _chatService.SendKmsByAppAsync(app, questions, history, filePath, _relevantSources);
+            StringBuilder rawContent = new StringBuilder();
             await foreach (var content in chatResult)
             {
-
-                info.Context += content.ConvertToString();
-                await Task.Delay(50);
+                rawContent.Append(content.ConvertToString());
+                info.Context = Markdown.ToHtml(rawContent.ToString());
+                await Task.Delay(30);
                 await InvokeAsync(StateHasChanged);
             }
-            //全部处理完后再处理一次Markdown
-            await MarkDown(info);
+            //全部处理完后再处理一次Markdown 处理代码高亮
+            await MarkDown();
         }
 
         /// <summary>
@@ -345,10 +347,12 @@ namespace AntSK.Pages.ChatPage.Components
         {
             Chats info = null;
             var chatResult = _chatService.SendChatByAppAsync(app, history);
+            StringBuilder rawContent = new StringBuilder();
             await foreach (var content in chatResult)
             {
                 if (info == null)
                 {
+                    rawContent.Append(content.ConvertToString());
                     info = new Chats();
                     info.Id = Guid.NewGuid().ToString();
                     info.UserName = _userName;
@@ -360,13 +364,14 @@ namespace AntSK.Pages.ChatPage.Components
                 }
                 else
                 {
-                    info.Context += content.ConvertToString();
-                    await Task.Delay(50);
+                    rawContent.Append(content.ConvertToString());
                 }
+                info.Context = Markdown.ToHtml(rawContent.ToString());
+                await Task.Delay(30);
                 await InvokeAsync(StateHasChanged);
             }
-            //全部处理完后再处理一次Markdown
-            await MarkDown(info);
+            //全部处理完后再处理一次Markdown 处理代码高亮
+            await MarkDown();
         }
 
         /// <summary>
@@ -374,14 +379,8 @@ namespace AntSK.Pages.ChatPage.Components
         /// </summary>
         /// <param name="info"></param>
         /// <returns></returns>
-        private async Task MarkDown(Chats info)
+        private async Task MarkDown()
         {
-            if (info.IsNotNull())
-            {
-                // info!.HtmlAnswers = markdown.Transform(info.HtmlAnswers);
-                info!.Context = Markdown.ToHtml(info.Context);
-
-            }
             await InvokeAsync(StateHasChanged);
             await _JSRuntime.InvokeVoidAsync("Prism.highlightAll");
             await _JSRuntime.ScrollToBottomAsync("scrollDiv");
