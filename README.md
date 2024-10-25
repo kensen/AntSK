@@ -103,9 +103,15 @@ networks:
   antsk:
 ```
 Taking this as an example, it means mounting the local D://model folder of Windows into the container /app/model. If so, the model address in your appsettings.json should be configured as
-```
-model/xxx.gguf
-```
+
+[LiteDockerCompose](https://github.com/AIDotNet/AntSK/blob/main/docker-compose.simple.yml)
+
+The compact version is deployed with sqlite-disk by one click
+
+[FullDockerCompose](https://github.com/AIDotNet/AntSK/blob/main/docker-compose.yml)
+
+The full version uses pg+aspire
+
 
 ## 3️⃣Some meanings of configuration file
 ```
@@ -211,7 +217,7 @@ If you plan to use AntSK in commercial projects, you need to ensure that you fol
    
 2. If you modify the software source code, you need to clearly indicate these modifications in the source code.
    
-3. Meet the above four requirements  
+3. Meet the above requirements  
 
 ## 💕 Special thanks
 Helping enterprise AI application development, we recommend [AntBlazor](https://antblazor.com)
