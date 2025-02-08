@@ -20,7 +20,7 @@
 
 - **Online Search**: AntSK, real-time access to the latest information, ensuring users receive the most timely and relevant data.
 
-- **Model Management**: Adapts and manages integration of different models from different manufacturers, including gguf types supported by **llama.cpp** and models offline running supported by **llamafactory** and **ollama**.
+- **Model Management**: Adapts and manages integration of different models from different manufacturers, models offline running supported by **llamafactory** and **ollama**.
 
 - **Domestic Innovation**: AntSK supports domestic models and databases and can run under domestic innovation conditions.
 
@@ -101,6 +101,7 @@ services:
       - D://model:/app/model
 networks:
   antsk:
+    external: true
 ```
 Taking this as an example, it means mounting the local D://model folder of Windows into the container /app/model. If so, the model address in your appsettings.json should be configured as
 
