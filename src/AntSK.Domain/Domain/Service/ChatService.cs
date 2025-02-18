@@ -90,10 +90,12 @@ namespace AntSK.Domain.Domain.Service
         public async IAsyncEnumerable<StreamingKernelContent> SendKmsByAppAsync(Apps app, string questions, ChatHistory history, string filePath, List<RelevantSource> relevantSources = null)
         {
             relevantSources?.Clear();
-            var relevantSourceList = await _kMService.GetRelevantSourceList(app, questions);
+            List<RelevantSource> relevantSourceList = new List<RelevantSource>();
+            
             var _kernel = _kernelService.GetKernelByApp(app);
             if (!string.IsNullOrWhiteSpace(filePath))
             {
+                //上传文件问答
                 var memory = _kMService.GetMemoryByApp(app);
 
                 // 匹配GUID的正则表达式
@@ -105,7 +107,7 @@ namespace AntSK.Domain.Domain.Service
                 {
                     var fileId = match.Value;
 
-                    var status=await  memory.IsDocumentReadyAsync(fileId, index: KmsConstantcs.KmsIndex);
+                    var status = await memory.IsDocumentReadyAsync(fileId, index: KmsConstantcs.KmsIndex);
                     if (!status)
                     {
                         var result = await memory.ImportDocumentAsync(new Document(fileId).AddFile(filePath)
@@ -128,6 +130,11 @@ namespace AntSK.Domain.Domain.Service
                     })));
                     app.Prompt = KmsConstantcs.KmsPrompt;
                 }
+            }
+            else 
+            {
+                //从知识库问答
+                relevantSourceList = await _kMService.GetRelevantSourceList(app, questions);
             }
 
 
